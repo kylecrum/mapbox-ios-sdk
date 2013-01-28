@@ -484,7 +484,10 @@
             if ( ! [candidateViewController.childViewControllers count] || [candidateViewController isEqual:self.window.rootViewController])
                 break;
         }
-
+        if ([candidateViewController isKindOfClass:[UINavigationController class]]) {
+            candidateViewController = ((UINavigationController *)candidateViewController).visibleViewController;
+        }
+        
         self.viewControllerPresentingAttribution = candidateViewController;
     }
     else if (self.viewControllerPresentingAttribution && _hideAttribution)

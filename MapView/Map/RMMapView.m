@@ -69,7 +69,7 @@
 
 #pragma mark --- end constants ----
 
-@interface RMMapView (PrivateMethods) <UIScrollViewDelegate, UIGestureRecognizerDelegate, RMMapScrollViewDelegate, CLLocationManagerDelegate, SMCalloutViewDelegate>
+@interface RMMapView (PrivateMethods) <UIScrollViewDelegate, UIGestureRecognizerDelegate, RMMapScrollViewDelegate, SMCalloutViewDelegate>
 
 @property (nonatomic, assign) UIViewController *viewControllerPresentingAttribution;
 @property (nonatomic, retain) RMUserLocation *userLocation;

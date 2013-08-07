@@ -62,8 +62,10 @@
 {
     dispatch_barrier_sync(_memoryCacheQueue, ^{
         [_memoryCache removeAllObjects];
-        _memoryCache = nil;
+        [_memoryCache release]; _memoryCache = nil;
     });
+
+	[super dealloc];
 }
 
 - (void)didReceiveMemoryWarning
@@ -91,7 +93,7 @@
 
     dispatch_sync(_memoryCacheQueue, ^{
 
-        cachedObject = [_memoryCache objectForKey:tileHash];
+        cachedObject = [[_memoryCache objectForKey:tileHash] retain];
 
         if (cachedObject)
         {
@@ -105,13 +107,15 @@
                     [_memoryCache removeObjectForKey:tileHash];
                 });
 
-                cachedObject = nil;
+                [cachedObject release]; cachedObject = nil;
             }
         }
 
     });
 
 //    RMLog(@"Memory cache hit    tile %d %d %d (%@)", tile.x, tile.y, tile.zoom, [RMTileCache tileHash:tile]);
+
+    [cachedObject autorelease];
 
     return [cachedObject cachedObject];
 }

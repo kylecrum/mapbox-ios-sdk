@@ -93,7 +93,7 @@
 
             if ([@"memory-cache" isEqualToString:type])
             {
-                _memoryCache = [self memoryCacheWithConfig:cfg];
+                _memoryCache = [[self memoryCacheWithConfig:cfg] retain];
                 continue;
             }
 
@@ -128,9 +128,11 @@
         [self cancelBackgroundCache];
     
     dispatch_barrier_sync(_tileCacheQueue, ^{
-         _memoryCache = nil;
-         _tileCaches = nil;
+        [_memoryCache release]; _memoryCache = nil;
+        [_tileCaches release]; _tileCaches = nil;
     });
+
+	[super dealloc];
 }
 
 - (void)addCache:(id <RMTileCache>)cache
@@ -172,7 +174,7 @@
 
         for (id <RMTileCache> cache in _tileCaches)
         {
-            image = [cache cachedImage:tile withCacheKey:aCacheKey];
+            image = [[cache cachedImage:tile withCacheKey:aCacheKey] retain];
 
             if (image != nil)
             {
@@ -183,7 +185,7 @@
 
     });
 
-	return image;
+	return [image autorelease];
 }
 
 - (void)addImage:(UIImage *)image forTile:(RMTile)tile withCacheKey:(NSString *)aCacheKey
@@ -257,7 +259,7 @@
     if (self.isBackgroundCaching)
         return;
 
-    _activeTileSource = tileSource;
+    _activeTileSource = [tileSource retain];
     
     _backgroundFetchQueue = [[NSOperationQueue alloc] init];
     [_backgroundFetchQueue setMaxConcurrentOperationCount:6];
@@ -303,9 +305,9 @@
         {
             for (int y = yMin; y <= yMax; y++)
             {
-                RMTileCacheDownloadOperation *operation = [[RMTileCacheDownloadOperation alloc] initWithTile:RMTileMake(x, y, zoom)
+                RMTileCacheDownloadOperation *operation = [[[RMTileCacheDownloadOperation alloc] initWithTile:RMTileMake(x, y, zoom)
                                                                                                 forTileSource:_activeTileSource
-                                                                                                   usingCache:self];
+                                                                                                   usingCache:self] autorelease];
 
                 __block RMTileCacheDownloadOperation *internalOperation = operation;
 
@@ -321,9 +323,11 @@
 
                             if (progTile == totalTiles)
                             {
-                                 _backgroundFetchQueue = nil;
+                                if (_backgroundFetchQueue)
+                                    [_backgroundFetchQueue release]; _backgroundFetchQueue = nil;
 
-                                 _activeTileSource = nil;
+                                if (_activeTileSource)
+                                    [_activeTileSource release]; _activeTileSource = nil;
 
                                 [_backgroundCacheDelegate tileCacheDidFinishBackgroundCache:self];
                             }
@@ -351,13 +355,13 @@
             {
                 [_backgroundFetchQueue cancelAllOperations];
                 [_backgroundFetchQueue waitUntilAllOperationsAreFinished];
-                 _backgroundFetchQueue = nil;
+                [_backgroundFetchQueue release]; _backgroundFetchQueue = nil;
 
                 didCancel = YES;
             }
 
             if (_activeTileSource)
-                 _activeTileSource = nil;
+                [_activeTileSource release]; _activeTileSource = nil;
 
             if (didCancel)
             {
@@ -451,7 +455,7 @@ static NSMutableDictionary *predicateValues = nil;
 
     RMLog(@"Memory cache configuration: {capacity : %d}", capacity);
 
-	return [[RMMemoryCache alloc] initWithCapacity:capacity];
+	return [[[RMMemoryCache alloc] initWithCapacity:capacity] autorelease];
 }
 
 - (id <RMTileCache>)databaseCacheWithConfig:(NSDictionary *)cfg
@@ -551,7 +555,7 @@ static NSMutableDictionary *predicateValues = nil;
 
     RMLog(@"Database cache configuration: {capacity : %d, strategy : %@, minimalPurge : %d, expiryPeriod: %.0f, useCacheDir : %@}", capacity, strategyStr, minimalPurge, _expiryPeriod, useCacheDir ? @"YES" : @"NO");
 
-    RMDatabaseCache *dbCache = [[RMDatabaseCache alloc] initUsingCacheDir:useCacheDir];
+    RMDatabaseCache *dbCache = [[[RMDatabaseCache alloc] initUsingCacheDir:useCacheDir] autorelease];
     [dbCache setCapacity:capacity];
     [dbCache setPurgeStrategy:strategy];
     [dbCache setMinimalPurge:minimalPurge];

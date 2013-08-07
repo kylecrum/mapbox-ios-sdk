@@ -1,7 +1,7 @@
 //
 //  RMConfiguration.m
 //
-// Copyright (c) 2008-2013, Route-Me Contributors
+// Copyright (c) 2008-2012, Route-Me Contributors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -63,22 +63,7 @@ static RMConfiguration *RMConfigurationSharedInstance = nil;
 
 + (id)brandedStringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error
 {
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-
-    [request setValue:[[RMConfiguration configuration] userAgent] forHTTPHeaderField:@"User-Agent"];
-
-    NSError *internalError = nil;
-
-    NSData *returnData = [NSURLConnection sendSynchronousRequest:request returningResponse:nil error:&internalError];
-
-    if ( ! returnData)
-    {
-        *error = internalError;
-
-        return nil;
-    }
-
-    return [[[self class] alloc] initWithData:returnData encoding:enc];
+    return [[self class] stringWithContentsOfURL:url encoding:enc error:error];
 }
 
 @end
@@ -107,7 +92,7 @@ static RMConfiguration *RMConfigurationSharedInstance = nil;
     if (!(self = [super init]))
         return nil;
 
-    _userAgent = [NSString stringWithFormat:@"MapBox iOS SDK (%@/%@)", [[UIDevice currentDevice] model], [[UIDevice currentDevice] systemVersion]];
+    _userAgent = [[NSString stringWithFormat:@"MapBox iOS SDK (%@/%@)", [[UIDevice currentDevice] model], [[UIDevice currentDevice] systemVersion]] retain];
 
     if (path == nil)
     {
@@ -120,17 +105,25 @@ static RMConfiguration *RMConfigurationSharedInstance = nil;
     NSString *error = nil;
     NSData *plistData = [NSData dataWithContentsOfFile:path];
 
-    _propertyList = [NSPropertyListSerialization propertyListFromData:plistData
-                                                     mutabilityOption:NSPropertyListImmutable
-                                                               format:NULL
-                                                     errorDescription:&error];
+    _propertyList = [[NSPropertyListSerialization propertyListFromData:plistData
+                                                      mutabilityOption:NSPropertyListImmutable
+                                                                format:NULL
+                                                      errorDescription:&error] retain];
 
     if ( ! _propertyList)
     {
         RMLog(@"problem reading route-me configuration from %@: %@", path, error);
+        [error release];
     }
 
     return self;
+}
+
+- (void)dealloc
+{
+    [_propertyList release]; _propertyList = nil;
+    [_userAgent release];
+    [super dealloc];
 }
 
 - (NSDictionary *)cacheConfiguration

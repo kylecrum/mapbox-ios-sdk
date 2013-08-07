@@ -44,7 +44,7 @@
 {
     if ( ! [super layer])
     {
-        RMShape *shape = [[RMShape alloc] initWithView:self.mapView];
+        RMShape *shape = [[[RMShape alloc] initWithView:self.mapView] autorelease];
 
         [shape performBatchOperations:^(RMShape *aShape)
         {

@@ -1,7 +1,7 @@
 //
 //  RMMapView.m
 //
-// Copyright (c) 2008-2013, Route-Me Contributors
+// Copyright (c) 2008-2012, Route-Me Contributors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -69,7 +69,7 @@
 
 #pragma mark --- end constants ----
 
-@interface RMMapView (PrivateMethods) <UIScrollViewDelegate, UIGestureRecognizerDelegate, RMMapScrollViewDelegate, CLLocationManagerDelegate, SMCalloutViewDelegate>
+@interface RMMapView (PrivateMethods) <UIScrollViewDelegate, UIGestureRecognizerDelegate, RMMapScrollViewDelegate, SMCalloutViewDelegate>
 
 @property (nonatomic, assign) UIViewController *viewControllerPresentingAttribution;
 @property (nonatomic, retain) RMUserLocation *userLocation;
@@ -156,8 +156,8 @@
     NSMutableSet *_annotations;
     NSMutableSet *_visibleAnnotations;
 
-    BOOL _constrainMovement, _constrainMovementByUser;
-    RMProjectedRect _constrainingProjectedBounds, _constrainingProjectedBoundsByUser;
+    BOOL _constrainMovement;
+    RMProjectedRect _constrainingProjectedBounds;
 
     double _metersPerPixel;
     float _zoom, _lastZoom;
@@ -205,7 +205,6 @@
 @synthesize quadTree = _quadTree;
 @synthesize clusteringEnabled = _clusteringEnabled;
 @synthesize positionClusterMarkersAtTheGravityCenter = _positionClusterMarkersAtTheGravityCenter;
-@synthesize orderMarkersByYPosition = _orderMarkersByYPosition;
 @synthesize orderClusterMarkersAboveOthers = _orderClusterMarkersAboveOthers;
 @synthesize clusterMarkerSize = _clusterMarkerSize, clusterAreaSize = _clusterAreaSize;
 @synthesize adjustTilesForRetinaDisplay = _adjustTilesForRetinaDisplay;
@@ -228,7 +227,7 @@
                                minZoomLevel:(float)initialTileSourceMinZoomLevel
                             backgroundImage:(UIImage *)backgroundImage
 {
-    _constrainMovement = _constrainMovementByUser = _bouncingEnabled = _zoomingInPivotsAroundCenter = NO;
+    _constrainMovement = _bouncingEnabled = _zoomingInPivotsAroundCenter = NO;
     _draggingEnabled = YES;
 
     _lastDraggingTranslation = CGPointZero;
@@ -237,7 +236,7 @@
     self.backgroundColor = [UIColor grayColor];
 
     self.clipsToBounds = YES;
-
+    
     _tileSourcesContainer = [RMTileSourcesContainer new];
     _tiledLayersSuperview = nil;
 
@@ -252,12 +251,9 @@
     _missingTilesDepth = 1;
     _debugTiles = NO;
 
-    _orderMarkersByYPosition = YES;
-    _orderClusterMarkersAboveOthers = YES;
-
     _annotations = [NSMutableSet new];
     _visibleAnnotations = [NSMutableSet new];
-    [self setQuadTree:[[RMQuadTree alloc] initWithMapView:self]];
+    [self setQuadTree:[[[RMQuadTree alloc] initWithMapView:self] autorelease]];
     _clusteringEnabled = NO;
     _positionClusterMarkersAtTheGravityCenter = YES;
     _clusterMarkerSize = CGSizeMake(100.0, 100.0);
@@ -269,16 +265,17 @@
     _zoomDelegateQueue = [NSOperationQueue new];
     [_zoomDelegateQueue setMaxConcurrentOperationCount:1];
 
-    [self setTileCache:[RMTileCache new]];
+    [self setTileCache:[[RMTileCache new] autorelease]];
 
     if (backgroundImage)
     {
-        [self setBackgroundView:[[UIView alloc] initWithFrame:[self bounds]]];
+        [self setBackgroundView:[[[UIView alloc] initWithFrame:[self bounds]] autorelease]];
         self.backgroundView.layer.contents = (id)backgroundImage.CGImage;
     }
     else
     {
-        [self setBackgroundView:nil];
+        _loadingTileView = [[[RMLoadingTileView alloc] initWithFrame:self.bounds] autorelease];
+        [self setBackgroundView:_loadingTileView];
     }
 
     if (initialTileSourceMinZoomLevel < newTilesource.minZoom) initialTileSourceMinZoomLevel = newTilesource.minZoom;
@@ -326,7 +323,7 @@
 	coordinate.latitude = kDefaultInitialLatitude;
 	coordinate.longitude = kDefaultInitialLongitude;
 
-    [self performInitializationWithTilesource:[RMMapBoxSource new]
+    [self performInitializationWithTilesource:[[RMMapBoxSource new] autorelease]
                              centerCoordinate:coordinate
                                     zoomLevel:kDefaultInitialZoomLevel
                                  maxZoomLevel:kDefaultMaximumZoomLevel
@@ -338,7 +335,7 @@
 
 - (id)initWithFrame:(CGRect)frame
 {
-    return [self initWithFrame:frame andTilesource:[RMMapBoxSource new]];
+    return [self initWithFrame:frame andTilesource:[[RMMapBoxSource new] autorelease]];
 }
 
 - (id)initWithFrame:(CGRect)frame andTilesource:(id <RMTileSource>)newTilesource
@@ -419,14 +416,38 @@
 
 - (void)dealloc
 {
+    [self setDelegate:nil];
+    [self setBackgroundView:nil];
+    [self setQuadTree:nil];
     [_moveDelegateQueue cancelAllOperations];
+    [_moveDelegateQueue release]; _moveDelegateQueue = nil;
     [_zoomDelegateQueue cancelAllOperations];
+    [_zoomDelegateQueue release]; _zoomDelegateQueue = nil;
+    [_draggedAnnotation release]; _draggedAnnotation = nil;
+    [_annotations release]; _annotations = nil;
+    [_visibleAnnotations release]; _visibleAnnotations = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_mapScrollView removeObserver:self forKeyPath:@"contentOffset"];
-    [_tileSourcesContainer cancelAllDownloads];
+    [_tiledLayersSuperview release]; _tiledLayersSuperview = nil;
+    [_mapScrollView release]; _mapScrollView = nil;
+    [_overlayView release]; _overlayView = nil;
+    [_tileSourcesContainer cancelAllDownloads]; [_tileSourcesContainer release]; _tileSourcesContainer = nil;
+    [_projection release]; _projection = nil;
+    [_mercatorToTileProjection release]; _mercatorToTileProjection = nil;
+    [self setTileCache:nil];
     _locationManager.delegate = nil;
     [_locationManager stopUpdatingLocation];
     [_locationManager stopUpdatingHeading];
+    [_locationManager release]; _locationManager = nil;
+    [_userLocation release]; _userLocation = nil;
+    [_accuracyCircleAnnotation release]; _accuracyCircleAnnotation = nil;
+    [_trackingHaloAnnotation release]; _trackingHaloAnnotation = nil;
+    [_userLocationTrackingView release]; _userLocationTrackingView = nil;
+    [_userHeadingTrackingView release]; _userHeadingTrackingView = nil;
+    [_userHaloTrackingView release]; _userHaloTrackingView = nil;
+    [_attributionButton release]; _attributionButton = nil;
+    [_logoBug release]; _logoBug = nil;
+    [super dealloc];
 }
 
 - (void)didReceiveMemoryWarning
@@ -466,16 +487,22 @@
 {
     if ( ! self.viewControllerPresentingAttribution && ! _hideAttribution)
     {
-        UIResponder *responder = self;
+        UIViewController *candidateViewController = self.window.rootViewController;
 
-        while ((responder = [responder nextResponder]))
+        while ([self isDescendantOfView:candidateViewController.view])
         {
-            if ([responder isKindOfClass:[UIViewController class]])
-            {
-                self.viewControllerPresentingAttribution = (UIViewController *)responder;
+            for (UIViewController *childViewController in candidateViewController.childViewControllers)
+                if ([self isDescendantOfView:childViewController.view])
+                    candidateViewController = childViewController;
+
+            if ( ! [candidateViewController.childViewControllers count] || [candidateViewController isEqual:self.window.rootViewController])
                 break;
-            }
         }
+        if ([candidateViewController isKindOfClass:[UINavigationController class]]) {
+            candidateViewController = ((UINavigationController *)candidateViewController).visibleViewController;
+        }
+        
+        self.viewControllerPresentingAttribution = candidateViewController;
     }
     else if (self.viewControllerPresentingAttribution && _hideAttribution)
     {
@@ -585,10 +612,7 @@
 
 - (void)completeMoveEventAfterDelay:(NSTimeInterval)delay
 {
-    if ( ! delay)
-        [_moveDelegateQueue setSuspended:NO];
-    else
-        [_moveDelegateQueue performSelector:@selector(setSuspended:) withObject:[NSNumber numberWithBool:NO] afterDelay:delay];
+    [_moveDelegateQueue performSelector:@selector(setSuspended:) withObject:[NSNumber numberWithBool:NO] afterDelay:delay];
 }
 
 - (void)registerZoomEventByUser:(BOOL)wasUserEvent
@@ -624,10 +648,7 @@
 
 - (void)completeZoomEventAfterDelay:(NSTimeInterval)delay
 {
-    if ( ! delay)
-        [_zoomDelegateQueue setSuspended:NO];
-    else
-        [_zoomDelegateQueue performSelector:@selector(setSuspended:) withObject:[NSNumber numberWithBool:NO] afterDelay:delay];
+    [_zoomDelegateQueue performSelector:@selector(setSuspended:) withObject:[NSNumber numberWithBool:NO] afterDelay:delay];
 }
 
 #pragma mark -
@@ -742,38 +763,8 @@
 
 - (void)setProjectedConstraintsSouthWest:(RMProjectedPoint)southWest northEast:(RMProjectedPoint)northEast
 {
-    _constrainMovement = _constrainMovementByUser = YES;
+    _constrainMovement = YES;
     _constrainingProjectedBounds = RMProjectedRectMake(southWest.x, southWest.y, northEast.x - southWest.x, northEast.y - southWest.y);
-    _constrainingProjectedBoundsByUser = RMProjectedRectMake(southWest.x, southWest.y, northEast.x - southWest.x, northEast.y - southWest.y);
-}
-
-- (void)setTileSourcesConstraintsFromLatitudeLongitudeBoundingBox:(RMSphericalTrapezium)bounds
-{
-    BOOL tileSourcesConstrainMovement = !(bounds.northEast.latitude == 90.0 && bounds.northEast.longitude == 180.0 && bounds.southWest.latitude == -90.0 && bounds.southWest.longitude == -180.0);
-
-    if (tileSourcesConstrainMovement)
-    {
-        _constrainMovement = YES;
-        RMProjectedRect tileSourcesConstrainingProjectedBounds = [self projectedRectFromLatitudeLongitudeBounds:bounds];
-
-        if (_constrainMovementByUser)
-        {
-            _constrainingProjectedBounds = RMProjectedRectIntersection(_constrainingProjectedBoundsByUser, tileSourcesConstrainingProjectedBounds);
-
-            if (RMProjectedRectIsZero(_constrainingProjectedBounds))
-                RMLog(@"The constraining bounds from tilesources and user don't intersect!");
-        }
-        else
-            _constrainingProjectedBounds = tileSourcesConstrainingProjectedBounds;
-    }
-    else if (_constrainMovementByUser)
-    {
-        _constrainingProjectedBounds = _constrainingProjectedBoundsByUser;
-    }
-    else
-    {
-        _constrainingProjectedBounds = _projection.planetBounds;
-    }
 }
 
 #pragma mark -
@@ -1123,25 +1114,25 @@
 {
     [_tileSourcesContainer cancelAllDownloads];
 
-    [_overlayView removeFromSuperview];  _overlayView = nil;
+    [_overlayView removeFromSuperview]; [_overlayView release]; _overlayView = nil;
 
-    for (__strong RMMapTiledLayerView *tiledLayerView in _tiledLayersSuperview.subviews)
+    for (RMMapTiledLayerView *tiledLayerView in _tiledLayersSuperview.subviews)
     {
         tiledLayerView.layer.contents = nil;
-        [tiledLayerView removeFromSuperview];  tiledLayerView = nil;
+        [tiledLayerView removeFromSuperview]; [tiledLayerView release]; tiledLayerView = nil;
     }
 
-    [_tiledLayersSuperview removeFromSuperview];  _tiledLayersSuperview = nil;
+    [_tiledLayersSuperview removeFromSuperview]; [_tiledLayersSuperview release]; _tiledLayersSuperview = nil;
 
     [_mapScrollView removeObserver:self forKeyPath:@"contentOffset"];
-    [_mapScrollView removeFromSuperview];  _mapScrollView = nil;
+    [_mapScrollView removeFromSuperview]; [_mapScrollView release]; _mapScrollView = nil;
 
     _mapScrollViewIsZooming = NO;
 
     int tileSideLength = [_tileSourcesContainer tileSideLength];
     CGSize contentSize = CGSizeMake(tileSideLength, tileSideLength); // zoom level 1
 
-    _mapScrollView = [[RMMapScrollView alloc] initWithFrame:self.bounds];
+    _mapScrollView = [[RMMapScrollView alloc] initWithFrame:[self bounds]];
     _mapScrollView.delegate = self;
     _mapScrollView.opaque = NO;
     _mapScrollView.backgroundColor = [UIColor clearColor];
@@ -1195,17 +1186,17 @@
     // add gesture recognizers
 
     // one finger taps
-    UITapGestureRecognizer *doubleTapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTap:)];
+    UITapGestureRecognizer *doubleTapRecognizer = [[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTap:)] autorelease];
     doubleTapRecognizer.numberOfTouchesRequired = 1;
     doubleTapRecognizer.numberOfTapsRequired = 2;
     doubleTapRecognizer.delegate = self;
 
-    UITapGestureRecognizer *singleTapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTap:)];
+    UITapGestureRecognizer *singleTapRecognizer = [[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTap:)] autorelease];
     singleTapRecognizer.numberOfTouchesRequired = 1;
     [singleTapRecognizer requireGestureRecognizerToFail:doubleTapRecognizer];
     singleTapRecognizer.delegate = self;
 
-    UILongPressGestureRecognizer *longPressRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+    UILongPressGestureRecognizer *longPressRecognizer = [[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)] autorelease];
     longPressRecognizer.delegate = self;
 
     [self addGestureRecognizer:singleTapRecognizer];
@@ -1213,14 +1204,14 @@
     [self addGestureRecognizer:longPressRecognizer];
 
     // two finger taps
-    UITapGestureRecognizer *twoFingerSingleTapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerSingleTap:)];
+    UITapGestureRecognizer *twoFingerSingleTapRecognizer = [[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTwoFingerSingleTap:)] autorelease];
     twoFingerSingleTapRecognizer.numberOfTouchesRequired = 2;
     twoFingerSingleTapRecognizer.delegate = self;
 
     [self addGestureRecognizer:twoFingerSingleTapRecognizer];
 
     // pan
-    UIPanGestureRecognizer *panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePanGesture:)];
+    UIPanGestureRecognizer *panGestureRecognizer = [[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePanGesture:)] autorelease];
     panGestureRecognizer.minimumNumberOfTouches = 1;
     panGestureRecognizer.maximumNumberOfTouches = 1;
 
@@ -1675,7 +1666,8 @@
             return;
 
         _lastDraggingTranslation = CGPointZero;
-        _draggedAnnotation = [self findAnnotationInLayer:hit];
+        [_draggedAnnotation release];
+        _draggedAnnotation = [[self findAnnotationInLayer:hit] retain];
     }
 
     if (recognizer.state == UIGestureRecognizerStateChanged)
@@ -1692,7 +1684,7 @@
     else if (recognizer.state == UIGestureRecognizerStateEnded)
     {
         [self didEndDragAnnotation:_draggedAnnotation];
-         _draggedAnnotation = nil;
+        [_draggedAnnotation release]; _draggedAnnotation = nil;
     }
 }
 
@@ -1737,13 +1729,11 @@
     {
         [self deselectAnnotation:_currentAnnotation animated:NO];
 
-        _currentAnnotation = anAnnotation;
+        _currentAnnotation = [anAnnotation retain];
 
         if (anAnnotation.layer.canShowCallout && anAnnotation.title)
         {
             _currentCallout = [SMCalloutView new];
-
-            _currentCallout.backgroundView = [SMCalloutBackgroundView systemBackgroundView];
 
             _currentCallout.title    = anAnnotation.title;
             _currentCallout.subtitle = anAnnotation.subtitle;
@@ -1753,7 +1743,7 @@
             if (anAnnotation.layer.leftCalloutAccessoryView)
             {
                 if ([anAnnotation.layer.leftCalloutAccessoryView isKindOfClass:[UIControl class]])
-                    [anAnnotation.layer.leftCalloutAccessoryView addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapOnCalloutAccessoryWithGestureRecognizer:)]];
+                    [anAnnotation.layer.leftCalloutAccessoryView addGestureRecognizer:[[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapOnCalloutAccessoryWithGestureRecognizer:)] autorelease]];
 
                 _currentCallout.leftAccessoryView = anAnnotation.layer.leftCalloutAccessoryView;
             }
@@ -1761,7 +1751,7 @@
             if (anAnnotation.layer.rightCalloutAccessoryView)
             {
                 if ([anAnnotation.layer.rightCalloutAccessoryView isKindOfClass:[UIControl class]])
-                    [anAnnotation.layer.rightCalloutAccessoryView addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapOnCalloutAccessoryWithGestureRecognizer:)]];
+                    [anAnnotation.layer.rightCalloutAccessoryView addGestureRecognizer:[[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapOnCalloutAccessoryWithGestureRecognizer:)] autorelease]];
 
                 _currentCallout.rightAccessoryView = anAnnotation.layer.rightCalloutAccessoryView;
             }
@@ -1795,8 +1785,8 @@
         else
             [self correctPositionOfAllAnnotations];
 
-         _currentAnnotation = nil;
-         _currentCallout = nil;
+        [_currentAnnotation release]; _currentAnnotation = nil;
+        [_currentCallout release]; _currentCallout = nil;
 
         if (_delegateHasDidDeselectAnnotation)
             [_delegate mapView:self didDeselectAnnotation:annotation];
@@ -1935,7 +1925,7 @@
 
 - (RMTileSourcesContainer *)tileSourcesContainer
 {
-    return _tileSourcesContainer;
+    return [[_tileSourcesContainer retain] autorelease];
 }
 
 - (id <RMTileSource>)tileSource
@@ -1966,11 +1956,20 @@
 
     RMProjectedPoint centerPoint = [self centerProjectedPoint];
 
-    _projection = [_tileSourcesContainer projection];
+    [_projection release];
+    _projection = [[_tileSourcesContainer projection] retain];
 
-    _mercatorToTileProjection = [_tileSourcesContainer mercatorToTileProjection];
+    [_mercatorToTileProjection release];
+    _mercatorToTileProjection = [[_tileSourcesContainer mercatorToTileProjection] retain];
 
-    [self setTileSourcesConstraintsFromLatitudeLongitudeBoundingBox:[_tileSourcesContainer latitudeLongitudeBoundingBox]];
+    RMSphericalTrapezium bounds = [_tileSourcesContainer latitudeLongitudeBoundingBox];
+
+    _constrainMovement = !(bounds.northEast.latitude == 90.0 && bounds.northEast.longitude == 180.0 && bounds.southWest.latitude == -90.0 && bounds.southWest.longitude == -180.0);
+
+    if (_constrainMovement)
+        _constrainingProjectedBounds = (RMProjectedRect)[self projectedRectFromLatitudeLongitudeBounds:bounds];
+    else
+        _constrainingProjectedBounds = _projection.planetBounds;
 
     [self setTileSourcesMinZoom:_tileSourcesContainer.minZoom];
     [self setTileSourcesMaxZoom:_tileSourcesContainer.maxZoom];
@@ -1997,11 +1996,20 @@
 
     RMProjectedPoint centerPoint = [self centerProjectedPoint];
 
-    _projection = [_tileSourcesContainer projection];
+    [_projection release];
+    _projection = [[_tileSourcesContainer projection] retain];
 
-    _mercatorToTileProjection = [_tileSourcesContainer mercatorToTileProjection];
+    [_mercatorToTileProjection release];
+    _mercatorToTileProjection = [[_tileSourcesContainer mercatorToTileProjection] retain];
 
-    [self setTileSourcesConstraintsFromLatitudeLongitudeBoundingBox:[_tileSourcesContainer latitudeLongitudeBoundingBox]];
+    RMSphericalTrapezium bounds = [_tileSourcesContainer latitudeLongitudeBoundingBox];
+
+    _constrainMovement = !(bounds.northEast.latitude == 90.0 && bounds.northEast.longitude == 180.0 && bounds.southWest.latitude == -90.0 && bounds.southWest.longitude == -180.0);
+
+    if (_constrainMovement)
+        _constrainingProjectedBounds = (RMProjectedRect)[self projectedRectFromLatitudeLongitudeBounds:bounds];
+    else
+        _constrainingProjectedBounds = _projection.planetBounds;
 
     [self setTileSourcesMinZoom:_tileSourcesContainer.minZoom];
     [self setTileSourcesMaxZoom:_tileSourcesContainer.maxZoom];
@@ -2040,11 +2048,9 @@
 
     if ([_tileSourcesContainer.tileSources count] == 0)
     {
+        [_projection release];
+        [_mercatorToTileProjection release];
         _constrainMovement = NO;
-    }
-    else
-    {
-        [self setTileSourcesConstraintsFromLatitudeLongitudeBoundingBox:[_tileSourcesContainer latitudeLongitudeBoundingBox]];
     }
 
     // Remove the map layer
@@ -2060,7 +2066,7 @@
     }
 
     tileSourceTiledLayerView.layer.contents = nil;
-    [tileSourceTiledLayerView removeFromSuperview];  tileSourceTiledLayerView = nil;
+    [tileSourceTiledLayerView removeFromSuperview]; [tileSourceTiledLayerView release]; tileSourceTiledLayerView = nil;
 
     [self setCenterProjectedPoint:centerPoint animated:NO];
 }
@@ -2073,18 +2079,16 @@
 
     if ([_tileSourcesContainer.tileSources count] == 0)
     {
+        [_projection release];
+        [_mercatorToTileProjection release];
         _constrainMovement = NO;
-    }
-    else
-    {
-        [self setTileSourcesConstraintsFromLatitudeLongitudeBoundingBox:[_tileSourcesContainer latitudeLongitudeBoundingBox]];
     }
 
     // Remove the map layer
     RMMapTiledLayerView *tileSourceTiledLayerView = [_tiledLayersSuperview.subviews objectAtIndex:index];
 
     tileSourceTiledLayerView.layer.contents = nil;
-    [tileSourceTiledLayerView removeFromSuperview];  tileSourceTiledLayerView = nil;
+    [tileSourceTiledLayerView removeFromSuperview]; [tileSourceTiledLayerView release]; tileSourceTiledLayerView = nil;
 
     [self setCenterProjectedPoint:centerPoint animated:NO];
 }
@@ -2158,45 +2162,27 @@
 
 - (UIView *)backgroundView
 {
-    return _backgroundView;
+    return [[_backgroundView retain] autorelease];
 }
 
 - (void)setBackgroundView:(UIView *)aView
 {
-    if ([_backgroundView isEqual:aView])
+    if (_backgroundView == aView)
         return;
 
-    if (_backgroundView)
-        [_backgroundView removeFromSuperview];
-
-    if ( ! aView)
+    if (_backgroundView != nil)
     {
-        if ( ! _loadingTileView)
-            _loadingTileView = [[RMLoadingTileView alloc] initWithFrame:self.bounds];
-
-        aView = _loadingTileView;
+        [_backgroundView removeFromSuperview];
+        [_backgroundView release];
     }
-    else
-        _loadingTileView = nil;
 
-    _backgroundView = aView;
+    _backgroundView = [aView retain];
+    if (_backgroundView == nil)
+        return;
 
-    _backgroundView.frame = self.bounds;
+    _backgroundView.frame = [self bounds];
 
     [self insertSubview:_backgroundView atIndex:0];
-}
-
-- (void)setBackgroundImage:(UIImage *)backgroundImage
-{
-    if (backgroundImage)
-    {
-        [self setBackgroundView:[[UIView alloc] initWithFrame:self.bounds]];
-        self.backgroundView.layer.contents = (id)backgroundImage.CGImage;
-    }
-    else
-    {
-        [self setBackgroundView:nil];
-    }
 }
 
 - (double)metersPerPixel
@@ -2251,9 +2237,6 @@
 
     if (newMinZoom < clampedMinZoom)
         newMinZoom = clampedMinZoom;
-
-    if (newMinZoom < 0.0)
-        newMinZoom = 0.0;
 
     _minZoom = newMinZoom;
 
@@ -2312,9 +2295,6 @@
 // if #zoom is outside of range #minZoom to #maxZoom, zoom level is clamped to that range.
 - (void)setZoom:(float)newZoom
 {
-    if (_zoom == newZoom)
-        return;
-
     [self registerZoomEventByUser:NO];
 
     _zoom = (newZoom > _maxZoom) ? _maxZoom : newZoom;
@@ -2415,12 +2395,12 @@
 
 - (RMProjection *)projection
 {
-    return _projection;
+    return [[_projection retain] autorelease];
 }
 
 - (RMFractalTileProjection *)mercatorToTileProjection
 {
-    return _mercatorToTileProjection;
+    return [[_mercatorToTileProjection retain] autorelease];
 }
 
 - (void)setDebugTiles:(BOOL)shouldDebug;
@@ -2448,6 +2428,7 @@
     else if ( ! showLogoBug && _logoBug)
     {
         [_logoBug removeFromSuperview];
+        [_logoBug release]; _logoBug = nil;
     }
 
     _showLogoBug = showLogoBug;
@@ -2740,7 +2721,7 @@
             }
         }
 
-        previousVisibleAnnotations = nil;
+        [previousVisibleAnnotations release];
 
 //        RMLog(@"%d annotations on screen, %d total", [overlayView sublayersCount], [annotations count]);
     }
@@ -2818,9 +2799,6 @@
 
 - (void)correctOrderingOfAllAnnotations
 {
-    if ( ! _orderMarkersByYPosition)
-        return;
-
     // sort annotation layer z-indexes so that they overlap properly
     //
     NSMutableArray *sortedAnnotations = [NSMutableArray arrayWithArray:[_visibleAnnotations allObjects]];
@@ -2842,10 +2820,10 @@
 
         // markers above shapes
         //
-        if (   [annotation1.layer isKindOfClass:[RMMarker class]] && ! [annotation2.layer isKindOfClass:[RMMarker class]])
+        if (   [annotation1.layer isKindOfClass:[RMMarker class]] && [@[[RMShape class], [RMCircle class]] containsObject:[annotation2.layer class]])
             return NSOrderedDescending;
 
-        if ( ! [annotation1.layer isKindOfClass:[RMMarker class]] &&   [annotation2.layer isKindOfClass:[RMMarker class]])
+        if (   [@[[RMShape class], [RMCircle class]] containsObject:[annotation1.layer class]] && [annotation2.layer isKindOfClass:[RMMarker class]])
             return NSOrderedAscending;
 
         // the rest in increasing y-position
@@ -2995,7 +2973,7 @@
         [_locationManager stopUpdatingLocation];
         [_locationManager stopUpdatingHeading];
         _locationManager.delegate = nil;
-         _locationManager = nil;
+        [_locationManager release]; _locationManager = nil;
 
         if (_delegateHasDidStopLocatingUser)
             [_delegate mapViewDidStopLocatingUser:self];
@@ -3005,8 +2983,8 @@
         for (RMAnnotation *annotation in [NSArray arrayWithObjects:_trackingHaloAnnotation, _accuracyCircleAnnotation, self.userLocation, nil])
             [self removeAnnotation:annotation];
 
-         _trackingHaloAnnotation = nil;
-         _accuracyCircleAnnotation = nil;
+        [_trackingHaloAnnotation release]; _trackingHaloAnnotation = nil;
+        [_accuracyCircleAnnotation release]; _accuracyCircleAnnotation = nil;
 
         self.userLocation = nil;
     }
@@ -3015,7 +2993,10 @@
 - (void)setUserLocation:(RMUserLocation *)newUserLocation
 {
     if ( ! [newUserLocation isEqual:_userLocation])
-        _userLocation = newUserLocation;
+    {
+        [_userLocation release];
+        _userLocation = [newUserLocation retain];
+    }
 }
 
 - (BOOL)isUserLocationVisible
@@ -3264,7 +3245,7 @@
 
     if ( ! _accuracyCircleAnnotation)
     {
-        _accuracyCircleAnnotation = [RMAnnotation annotationWithMapView:self coordinate:newLocation.coordinate andTitle:nil];
+        _accuracyCircleAnnotation = [[RMAnnotation annotationWithMapView:self coordinate:newLocation.coordinate andTitle:nil] retain];
         _accuracyCircleAnnotation.annotationType = kRMAccuracyCircleAnnotationTypeName;
         _accuracyCircleAnnotation.clusteringEnabled = NO;
         _accuracyCircleAnnotation.enabled = NO;
@@ -3312,7 +3293,7 @@
 
     if ( ! _trackingHaloAnnotation)
     {
-        _trackingHaloAnnotation = [RMAnnotation annotationWithMapView:self coordinate:newLocation.coordinate andTitle:nil];
+        _trackingHaloAnnotation = [[RMAnnotation annotationWithMapView:self coordinate:newLocation.coordinate andTitle:nil] retain];
         _trackingHaloAnnotation.annotationType = kRMTrackingHaloAnnotationTypeName;
         _trackingHaloAnnotation.clusteringEnabled = NO;
         _trackingHaloAnnotation.enabled = NO;
@@ -3372,7 +3353,7 @@
         //
         if ( ! [_userHaloTrackingView.layer.animationKeys count])
             for (NSString *animationKey in _trackingHaloAnnotation.layer.animationKeys)
-                [_userHaloTrackingView.layer addAnimation:[[_trackingHaloAnnotation.layer animationForKey:animationKey] copy] forKey:animationKey];
+                [_userHaloTrackingView.layer addAnimation:[[[_trackingHaloAnnotation.layer animationForKey:animationKey] copy] autorelease] forKey:animationKey];
     }
 
     if ( ! [_annotations containsObject:self.userLocation])
@@ -3516,7 +3497,7 @@
     
     if (_viewControllerPresentingAttribution && ! _attributionButton)
     {
-        _attributionButton = [UIButton buttonWithType:UIButtonTypeInfoLight];
+        _attributionButton = [[UIButton buttonWithType:UIButtonTypeInfoLight] retain];
         
         _attributionButton.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleLeftMargin;
         
@@ -3532,6 +3513,7 @@
     else if ( ! _viewControllerPresentingAttribution && _attributionButton)
     {
         [_attributionButton removeFromSuperview];
+        [_attributionButton release]; _attributionButton = nil;
     }
 }
 
@@ -3539,7 +3521,7 @@
 {
     if (_viewControllerPresentingAttribution)
     {
-        RMAttributionViewController *attributionViewController = [[RMAttributionViewController alloc] initWithMapView:self];
+        RMAttributionViewController *attributionViewController = [[[RMAttributionViewController alloc] initWithMapView:self] autorelease];
         
         attributionViewController.modalTransitionStyle = UIModalTransitionStylePartialCurl;
         

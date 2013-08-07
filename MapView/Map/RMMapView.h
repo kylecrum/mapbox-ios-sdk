@@ -1,7 +1,7 @@
 //
 //  RMMapView.h
 //
-// Copyright (c) 2008-2013, Route-Me Contributors
+// Copyright (c) 2008-2012, Route-Me Contributors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -59,7 +59,7 @@ typedef enum : NSUInteger {
 /** An RMMapView object provides an embeddable map interface, similar to the one provided by Apple's MapKit. You use this class to display map information and to manipulate the map contents from your application. You can center the map on a given coordinate, specify the size of the area you want to display, and annotate the map with custom information.
 *
 *   @warning Please note that you are responsible for getting permission to use the map data, and for ensuring your use adheres to the relevant terms of use. */
-@interface RMMapView : UIView
+@interface RMMapView : UIView <CLLocationManagerDelegate>
 
 /** @name Accessing the Delegate */
 
@@ -68,7 +68,7 @@ typedef enum : NSUInteger {
 *   A map view sends messages to its delegate regarding the loading of map data and changes in the portion of the map being displayed. The delegate also manages the annotation layers used to highlight points of interest on the map.
 *
 *   The delegate should implement the methods of the RMMapViewDelegate protocol. */
-@property (nonatomic, weak) IBOutlet id <RMMapViewDelegate>delegate;
+@property (nonatomic, assign) IBOutlet id <RMMapViewDelegate>delegate;
 
 #pragma mark - View properties
 
@@ -123,10 +123,7 @@ typedef enum : NSUInteger {
 @property (nonatomic, assign) NSUInteger missingTilesDepth;
 
 /** A custom, static view to use behind the map tiles. The default behavior is to use grid imagery that moves with map panning like MapKit. */
-@property (nonatomic, strong) UIView *backgroundView;
-
-/** A custom image to use behind the map tiles. The default behavior is to show the default `backgroundView` and not a static image. */
-- (void)setBackgroundImage:(UIImage *)backgroundImage;
+@property (nonatomic, retain) UIView *backgroundView;
 
 /** A Boolean value indicating whether to draw tile borders and z/x/y numbers on tile images for debugging purposes. Defaults to `NO`. */
 @property (nonatomic, assign) BOOL debugTiles;
@@ -295,10 +292,10 @@ typedef enum : NSUInteger {
 /** @name Annotating the Map */
 
 /** The annotations currently added to the map. Includes user location annotations, if any. */
-@property (nonatomic, weak, readonly) NSArray *annotations;
+@property (nonatomic, readonly) NSArray *annotations;
 
 /** The annotations currently visible on the map. May include annotations currently shown in clusters. */
-@property (nonatomic, weak, readonly) NSArray *visibleAnnotations;
+@property (nonatomic, readonly) NSArray *visibleAnnotations;
 
 /** Add an annotation to the map. 
 *   @param annotation The annotation to add. */
@@ -337,19 +334,16 @@ typedef enum : NSUInteger {
 - (void)deselectAnnotation:(RMAnnotation *)annotation animated:(BOOL)animated;
 
 /** The annotation that is currently selected. */
-@property (nonatomic, strong) RMAnnotation *selectedAnnotation;
+@property (nonatomic, retain) RMAnnotation *selectedAnnotation;
 
 #pragma mark - TileSources
 
-@property (nonatomic, strong) RMQuadTree *quadTree;
+@property (nonatomic, retain) RMQuadTree *quadTree;
 
 /** @name Configuring Annotation Clustering */
 
 /** Whether to enable clustering of map point annotations. Defaults to `NO`. */
 @property (nonatomic, assign) BOOL clusteringEnabled;
-
-/** Whether to order markers on the z-axis according to increasing y-position. Defaults to `YES`. */
-@property (nonatomic, assign) BOOL orderMarkersByYPosition;
 
 /** Whether to position cluster markers at the weighted center of the points they represent. If `YES`, position clusters in weighted fashion. If `NO`, position them on a rectangular grid. Defaults to `YES`. */
 @property (nonatomic, assign) BOOL positionClusterMarkersAtTheGravityCenter;
@@ -360,15 +354,15 @@ typedef enum : NSUInteger {
 @property (nonatomic, assign) CGSize clusterMarkerSize;
 @property (nonatomic, assign) CGSize clusterAreaSize;
 
-@property (nonatomic, weak, readonly) RMTileSourcesContainer *tileSourcesContainer;
+@property (nonatomic, readonly) RMTileSourcesContainer *tileSourcesContainer;
 
 /** @name Managing Tile Sources */
 
 /** The first tile source of a map view, ordered from bottom to top. */
-@property (nonatomic, strong) id <RMTileSource> tileSource;
+@property (nonatomic, retain) id <RMTileSource> tileSource;
 
 /** All of the tile sources for a map view, ordered bottom to top. */
-@property (nonatomic, strong) NSArray *tileSources;
+@property (nonatomic, retain) NSArray *tileSources;
 
 /** Add a tile source to a map view above the current tile sources. 
 *   @param tileSource The tile source to add. */
@@ -415,7 +409,7 @@ typedef enum : NSUInteger {
 /** @name Managing Tile Caching Behavior */
 
 /** The tile cache for the map view, typically composed of both an in-memory RMMemoryCache and a disk-based RMDatabaseCache. */
-@property (nonatomic, strong)   RMTileCache *tileCache;
+@property (nonatomic, retain)   RMTileCache *tileCache;
 
 /** Clear all tile images from the caching system. */
 -(void)removeAllCachedImages;
@@ -423,8 +417,8 @@ typedef enum : NSUInteger {
 #pragma mark - Conversions
 
 // projections to convert from latitude/longitude to meters, from projected meters to tile coordinates
-@property (nonatomic, weak, readonly) RMProjection *projection;
-@property (nonatomic, weak, readonly) id <RMMercatorToTileProjection> mercatorToTileProjection;
+@property (nonatomic, readonly) RMProjection *projection;
+@property (nonatomic, readonly) id <RMMercatorToTileProjection> mercatorToTileProjection;
 
 /** @name Converting Map Coordinates */
 

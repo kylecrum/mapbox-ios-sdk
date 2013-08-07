@@ -1,5 +1,5 @@
 //
-//  RMInteractiveSource.m
+//  RMInteractiveSource.h
 //
 //  Created by Justin R. Miller on 6/22/11.
 //  Copyright 2012 MapBox.
@@ -407,7 +407,7 @@ RMTilePoint RMInteractiveSourceNormalizedTilePointForMapView(CGPoint point, RMMa
     if (gridData)
     {
         NSData *inflatedData = [gridData gzipInflate];
-        NSString *gridString = [[NSString alloc] initWithData:inflatedData encoding:NSUTF8StringEncoding];
+        NSString *gridString = [[[NSString alloc] initWithData:inflatedData encoding:NSUTF8StringEncoding] autorelease];
         
         id grid = [NSJSONSerialization JSONObjectWithData:[gridString dataUsingEncoding:NSUTF8StringEncoding]
                                                   options:0
@@ -548,7 +548,7 @@ RMTilePoint RMInteractiveSourceNormalizedTilePointForMapView(CGPoint point, RMMa
         
         if (gridData)
         {
-            NSMutableString *gridString = [[NSMutableString alloc] initWithData:gridData encoding:NSUTF8StringEncoding];
+            NSMutableString *gridString = [[[NSMutableString alloc] initWithData:gridData encoding:NSUTF8StringEncoding] autorelease];
             
             // remove JSONP 'grid(' and ');' bits
             //
@@ -573,7 +573,7 @@ RMTilePoint RMInteractiveSourceNormalizedTilePointForMapView(CGPoint point, RMMa
                     if (data && [data objectForKey:keyName])
                     {
                         NSData   *jsonData   = [NSJSONSerialization dataWithJSONObject:[data objectForKey:keyName] options:0 error:nil];
-                        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+                        NSString *jsonString = [[[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding] autorelease];
                         
                         return [NSDictionary dictionaryWithObjectsAndKeys:keyName,    @"keyName",
                                                                           jsonString, @"keyJSON",

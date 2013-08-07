@@ -44,9 +44,15 @@
     if (!(self = [super initWithMapView:aMapView points:points]))
         return nil;
 
-    _interiorPolygons = interiorPolygons;
+    _interiorPolygons = [interiorPolygons retain];
 
     return self;
+}
+
+- (void)dealloc
+{
+    [_interiorPolygons release]; _interiorPolygons = nil;
+    [super dealloc];
 }
 
 - (void)setLayer:(RMMapLayer *)newLayer
@@ -61,7 +67,7 @@
 {
     if ( ! [super layer])
     {
-        RMShape *shape = [[RMShape alloc] initWithView:self.mapView];
+        RMShape *shape = [[[RMShape alloc] initWithView:self.mapView] autorelease];
 
         [shape performBatchOperations:^(RMShape *aShape)
         {

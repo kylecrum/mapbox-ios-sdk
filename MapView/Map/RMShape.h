@@ -1,7 +1,7 @@
 //
 //  RMShape.h
 //
-// Copyright (c) 2008-2013, Route-Me Contributors
+// Copyright (c) 2008-2012, Route-Me Contributors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -41,7 +41,7 @@
     float lineWidth;
 
     // Line dash style
-    __weak NSArray *lineDashLengths;
+    NSArray *lineDashLengths;
     CGFloat lineDashPhase;
 
     BOOL scaleLineWidth;
@@ -56,17 +56,17 @@
 
 /** @name Accessing the Drawing Properties */
 
-@property (nonatomic, strong) NSString *fillRule;
-@property (nonatomic, strong) NSString *lineCap;
-@property (nonatomic, strong) NSString *lineJoin;
+@property (nonatomic, retain) NSString *fillRule;
+@property (nonatomic, retain) NSString *lineCap;
+@property (nonatomic, retain) NSString *lineJoin;
 
 /** The line color of the shape. Defaults to black. */
-@property (nonatomic, strong) UIColor *lineColor;
+@property (nonatomic, retain) UIColor *lineColor;
 
 /** The fill color of the shape. Defaults to clear. */
-@property (nonatomic, strong) UIColor *fillColor;
+@property (nonatomic, retain) UIColor *fillColor;
 
-@property (nonatomic, weak) NSArray *lineDashLengths;
+@property (nonatomic, assign) NSArray *lineDashLengths;
 @property (nonatomic, assign) CGFloat lineDashPhase;
 @property (nonatomic, assign) BOOL scaleLineDash;
 

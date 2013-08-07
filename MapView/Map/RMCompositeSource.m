@@ -2,7 +2,7 @@
 //  RMCompositeSource.m
 //  MapView
 //
-// Copyright (c) 2008-2013, Route-Me Contributors
+// Copyright (c) 2008-2012, Route-Me Contributors
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 
     if (tileCacheKey)
     {
-        _uniqueTilecacheKey = tileCacheKey;
+        _uniqueTilecacheKey = [tileCacheKey retain];
     }
     else
     {
@@ -73,9 +73,16 @@
     return self;
 }
 
+- (void)dealloc
+{
+    [_uniqueTilecacheKey release]; _uniqueTilecacheKey = nil;
+    [_tileSources release]; _tileSources = nil;
+    [super dealloc];
+}
+
 - (NSArray *)tileSources
 {
-    return [_tileSources copy];
+    return [[_tileSources copy] autorelease];
 }
 
 - (NSString *)uniqueTilecacheKey
@@ -121,6 +128,8 @@
     {
         [[NSNotificationCenter defaultCenter] postNotificationName:RMTileRequested object:[NSNumber numberWithUnsignedLongLong:RMTileKey(tile)]];
     });
+
+    [tileCache retain];
 
     NSMutableArray *tileImages = [NSMutableArray arrayWithCapacity:[_tileSources count]];
 
@@ -169,6 +178,8 @@
 
     if (image && self.isCacheable)
         [tileCache addImage:image forTile:tile withCacheKey:[self uniqueTilecacheKey]];
+
+    [tileCache release];
 
     dispatch_async(dispatch_get_main_queue(), ^(void)
     {

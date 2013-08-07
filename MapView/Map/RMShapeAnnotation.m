@@ -49,4 +49,10 @@
     return self;
 }
 
+- (void)dealloc
+{
+    [_points release]; _points = nil;
+    [super dealloc];
+}
+
 @end

@@ -132,6 +132,9 @@
 
     shapeLayer.lineWidth = scaledLineWidth;
 
+    if (self.fillPatternImage)
+        shapeLayer.fillColor = [[UIColor colorWithPatternImage:self.fillPatternImage] CGColor];
+
     if (lineDashLengths)
     {
         if (scaleLineDash)
@@ -509,6 +512,18 @@
     }
 }
 
+- (void)setFillPatternImage:(UIImage *)fillPatternImage
+{
+    if (fillPatternImage)
+        self.fillColor = nil;
+
+    if (_fillPatternImage != fillPatternImage)
+    {
+        _fillPatternImage = fillPatternImage;
+        [self recalculateGeometryAnimated:NO];
+    }
+}
+
 - (CGFloat)shadowBlur
 {
     return shapeLayer.shadowRadius;
@@ -573,8 +588,11 @@
 
 - (void)setAnnotation:(RMAnnotation *)newAnnotation
 {
-    super.annotation = newAnnotation;
-    [self recalculateGeometryAnimated:NO];
+    if (newAnnotation)
+    {
+        super.annotation = newAnnotation;
+        [self recalculateGeometryAnimated:NO];
+    }
 }
 
 @end

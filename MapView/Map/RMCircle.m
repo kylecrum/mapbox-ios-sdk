@@ -129,6 +129,9 @@
     [self.shapeLayer setFillColor:[fillColor CGColor]];
     [self.shapeLayer setStrokeColor:[lineColor CGColor]];
     [self.shapeLayer setLineWidth:lineWidthInPixels];
+
+    if (self.fillPatternImage)
+        self.shapeLayer.fillColor = [[UIColor colorWithPatternImage:self.fillPatternImage] CGColor];
 }
 
 #pragma mark - Accessors
@@ -154,6 +157,18 @@
     {
         [fillColor release];
         fillColor = [newFillColor retain];
+        [self updateCirclePathAnimated:NO];
+    }
+}
+
+- (void)setFillPatternImage:(UIImage *)fillPatternImage
+{
+    if (fillPatternImage)
+        self.fillColor = nil;
+
+    if (_fillPatternImage != fillPatternImage)
+    {
+        _fillPatternImage = fillPatternImage;
         [self updateCirclePathAnimated:NO];
     }
 }

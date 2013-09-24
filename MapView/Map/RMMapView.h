@@ -135,6 +135,9 @@ typedef enum : NSUInteger {
 
 /** @name Initializing a Map View */
 
+/** Initialize a map view with a given frame. A default watermarked MapBox map tile source will be used. */
+- (id)initWithFrame:(CGRect)frame;
+
 /** Initialize a map view with a given frame and tile source. 
 *   @param frame The frame with which to initialize the map view. 
 *   @param newTilesource The tile source to use for the map tiles. 
@@ -161,6 +164,7 @@ typedef enum : NSUInteger {
 - (void)setFrame:(CGRect)frame;
 
 + (UIImage *)resourceImageNamed:(NSString *)imageName;
++ (NSString *)pathForBundleResourceNamed:(NSString *)name ofType:(NSString *)extension;
 
 #pragma mark - Movement
 
@@ -492,6 +496,9 @@ typedef enum : NSUInteger {
 @property (nonatomic, assign)   BOOL displayHeadingCalibration;
 
 /** Set the mode used to track the user location. 
+*
+*   Setting the tracking mode to `RMUserTrackingModeFollow` or `RMUserTrackingModeFollowWithHeading` causes the map view to center the map on that location and begin tracking the user’s location. If the map is zoomed out, the map view automatically zooms in on the user’s location, effectively changing the current visible region.
+*
 *   @param mode The mode used to track the user location. 
 *   @param animated Whether changes to the map center or rotation should be animated when the mode is changed. */
 - (void)setUserTrackingMode:(RMUserTrackingMode)mode animated:(BOOL)animated;
